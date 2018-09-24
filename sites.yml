@@ -1,0 +1,11 @@
+pageTitle: Make Place Deployments
+sites:
+  - link: pugs.place
+    info: A pug spotter to demonstrate the platform
+  
+  - link: wip.make.place
+    info: An example coming-soon page
+  
+  - link: geo.mkpl.co
+    info: The geographical API that powers Make Place
+  

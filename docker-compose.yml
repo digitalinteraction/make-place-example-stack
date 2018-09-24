@@ -1,0 +1,165 @@
+# Based on: https://github.com/robb-j/common/blob/master/web-stack/docker-compose.yml
+
+version: '3.5'
+
+
+# Name our network
+# (useful if you want to use external docker-compose files)
+networks:
+  default:
+    name: web_stack
+
+
+# Named volumes
+# (Places to store data that will persist a `docker-compose down`)
+volumes:
+  mysql_data:
+  pugs_assets:
+  dev_assets:
+
+
+# The container services that make up our stack
+services:
+  
+  # * * * * System * * * * #
+  
+  # Nginx container for managing http(s) traffic
+  # Its configuration is automatically generated and mounted in using volumes
+  nginx:
+    container_name: nginx
+    image: nginx:1-alpine
+    restart: always
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/confd:/etc/nginx/conf.d
+      - ./nginx/vhostd:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - ./certs:/etc/nginx/certs:ro
+      - ./common.conf:/etc/nginx/common.conf:ro
+      - ./redirs.conf:/etc/nginx/conf.d/redirs.conf:ro
+  
+  # Nginx configuration generator
+  # (looks at container.VIRTUAL_HOST)
+  # to generate nginx config and mounts them into `nginx` & reloads it
+  # see -> https://github.com/jwilder/docker-gen
+  nginx-gen:
+    container_name: nginx-gen
+    image: jwilder/docker-gen
+    restart: always
+    volumes:
+      - ./nginx/confd:/etc/nginx/conf.d
+      - ./nginx/vhostd:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - ./certs:/etc/nginx/certs:ro
+      - ./nginx.tmpl.conf:/etc/docker-gen/templates/nginx.tmpl:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    command: '-notify-sighup nginx -watch -wait 5s:30s /etc/docker-gen/templates/nginx.tmpl /etc/nginx/conf.d/default.conf'
+  
+  # Letsencrypt cert generator
+  # (looks at container.LETSENCRYPT_HOST & container.LETSENCRYPT_EMAIL)
+  # to generate SSL certs and mounts them into `nginx` & reloads
+  # see -> https://github.com/JrCs/docker-letsencrypt-nginx-proxy-companion
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt
+    restart: always
+    environment:
+      NGINX_DOCKER_GEN_CONTAINER: nginx-gen
+      NGINX_PROXY_CONTAINER: nginx
+    volumes:
+      - ./nginx/confd:/etc/nginx/conf.d
+      - ./nginx/vhostd:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - ./certs:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  
+  
+  
+  # * * * * Services * * * * #
+  
+  # Mysql database to store instance & geographical data
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+    env_file:
+      - secrets/mysql.env
+  
+  # Geography service for geographical data
+  # https://github.com/make-place/geography
+  geo:
+    image: mkpl/geography:1.1.1
+    restart: always
+    env_file:
+      - secrets/geo.env
+    environment:
+      - API_PORT=80
+      - VIRTUAL_HOST=geo.mkpl.co
+      - LETSENCRYPT_HOST=geo.mkpl.co
+      - LETSENCRYPT_EMAIL=rob.anderson@ncl.ac.uk
+  
+  # Automatic daily mysql > AWS S3 backups
+  backup:
+    image: schickling/mysql-backup-s3
+    restart: always
+    env_file:
+      - secrets/backup.env
+    environment:
+      - MYSQL_HOST=mysql
+      - SCHEDULE=@daily
+  
+  # A site index, to highlight availble services
+  index-site:
+    image: robbj/site-index:1.1.0
+    restart: always
+    container_name: index
+    volumes:
+      - ./sites.yml:/app/web/sites.yml
+    environment:
+      - VIRTUAL_HOST=explore.make.place
+      - LETSENCRYPT_HOST=explore.make.place
+      - LETSENCRYPT_EMAIL=rob.anderson@ncl.ac.uk
+  
+  
+  
+  
+  # * * * * Deployments * * * * #
+  
+  # A deployment of the php platform on pugs.place
+  pug-spotter:
+    image: mkpl/php-platform:3.6.1
+    restart: unless-stopped
+    volumes:
+      - pugs_assets:/app/assets
+    env_file:
+      - secrets/common.env
+      - secrets/pugs.env
+    environment:
+      PRIMARY_COL: #f95162
+      ADMIN_EMAIL: noreply@make.place
+      VIRTUAL_HOST: pugs.place
+      LETSENCRYPT_HOST: pugs.place
+      LETSENCRYPT_EMAIL: rob.anderson@ncl.ac.uk
+  
+  # A deployment of a static holding page on wip.make.place
+  holding-site:
+    image: mkpl/static-pages:0.2.1
+    env_file:
+      - secrets/common.env
+    environment:
+      CONFIG_KEYS: SITE_MODE,SITE_TITLE
+      SITE_MODE: unavailable
+      SITE_TITLE: Make Place
+      VIRTUAL_HOST: wip.make.place
+      LETSENCRYPT_HOST: wip.make.place
+      LETSENCRYPT_EMAIL: rob.anderson@ncl.ac.uk
+  
+  

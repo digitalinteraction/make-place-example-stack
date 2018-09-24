@@ -1,0 +1,22 @@
+# A GitLab Pipeline which deploys a set of instances
+# deploys: "geo", "index-site", "pug-spotter" & "holding-site"
+# Requires scripts/deploy.sh is placed in the user's path e.g. /usr/bin/deploy
+
+variables:
+  DOCKER_DRIVER: overlay
+
+stages:
+  - deploy
+
+deploy_mkpl:
+  image: robbj/alpine-ssh
+  stage: deploy
+  tags:
+    - docker
+  environment:
+    name: make.place
+  script:
+    - echo "$DEPLOY_SECRET" > deploy_key
+    - echo "$DEPLOY_PUBLIC" > deploy_key.pub
+    - chmod 600 deploy_key
+    - ssh -o StrictHostKeyChecking=no -i deploy_key deploy@mkpl.co deploy geo index-site pug-spotter holding-site
