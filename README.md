@@ -91,12 +91,14 @@ git clone $YOUR_REPO
 
 # Create any .env files at this point
 # i.e. recreate your local secrets/ folder on the server
+# Ensure to set mysql.env's root password and remember this value
 
 # Startup the core core containers
 docker-compose up -d nginx nginx-gen letsencrypt mysql
 
 # Configure your mysql now (i.e. with a GUI like Sequel Pro)
 # Add a databases for each deployment and one for the geo service & access
+# You should have access with username `root` and the password from above
 
 # Fill in your .env files with credentials, see secrets/ for what should be set
 
