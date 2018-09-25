@@ -1,7 +1,7 @@
 # Example Make Place deployment stack
 
-The docker-compose stack used to deploy one or more instances of Make Place.
-The idea is you have a repo for your stack, which contains all of your instances.
+An example docker-compose stack used to deploy one or more instances of Make Place.
+Fork this repo to create your own for your stack, to contains all of your instances.
 
 ## Features
 
@@ -10,30 +10,34 @@ The idea is you have a repo for your stack, which contains all of your instances
 * Secure by default, your secrets are only ever on your server
 * Containerised, each deployment is separate and cannot interaction with each other
 * Scalable, add more deployments by modifying Yaml files
-* Option GitLab pipeline to automatically deploy when you push changes
+* Optional GitLab pipeline to automatically deploy when you push changes
 
-## Requirements
+## Prerequisites
+
+* Working knowledge of MySQL, Bash, SSH & Git
+
+## System requirements
 
 * Docker
 * docker-compose
-* Understanding of MySQL
-* Understanding of Bash & SSH
-* Understanding of git
+
+## How it works
+
+1. You have your repo fork checked out locally and on the server.
+2. You have the repo checked out on the server with your secrets filled in.
+3. To make deployments you configure your `docker-compose.yml` locally and push it to git.
+4. You can run `ssh user@server.io deploy deployment-a deployment-b` to deploy changes,
+    which could be executed from a continuous deployment pipeline.
 
 ## Local setup
 
-Follow these steps to setup a repository
-
-> Where $YOUR_REPO is the git url where you are going to put this
+Follow these steps to setup a local repository, where `$YOUR_REPO` is the git url of your fork.
 
 ```bash
-# Clone this repo locally
-git clone git@github.com:make-place/example-web-stack.git
+# Clone your repo fork locally
+git clone $YOUR_REPO
 
-# Update the project's remote to your one
-git remote set-url origin $YOUR_REPO
-
-# Get the latest nginx template and push it to your repo
+# Get the latest nginx template
 curl https://raw.githubusercontent.com/jwilder/nginx-proxy/master/nginx.tmpl -o nginx.tmpl.conf
 
 # Make the example .gitignore a real one
@@ -50,22 +54,23 @@ git push -u origin master
 ## Deployment configuration
 
 Deployments are defined as services in the `docker-compose.yml` at the bottom.
-To add a deployment, copy the `pug-spotter` service and make the following changes:
+To add a deployment, copy/replace the `pug-spotter` service and make the following changes:
 
-1. Replace `pugs_assets` with something unique to the deployment
-  * Also add it as an entry to the root level `volumes` at the top
-2. Replace `secrets/pugs.env` with something unique to the deployment
-3. Configure your environment
-  * See the [platform repo](https://github.com/make-place/php-platform/blob/master/README.md#environment-variables) for configuration variables
-  * Set `VIRTUAL_HOST` & `LETSENCRYPT_HOST` to the domain you want the website to be on
-  * Set `LETSENCRYPT_EMAIL` to your email address, you will receive letsencrypt errors here
-
+1. Setup an assets volume
+  1. Set `pugs_assets` to something unique
+  2. Add it as an entry to the root level `volumes` at the top
+2. Set `secrets/pugs.env` to a new secrets filename
+3. Configure the deployment's environment
+  * Set `VIRTUAL_HOST` & `LETSENCRYPT_HOST` to your domain
+  * Set `LETSENCRYPT_EMAIL` to your email address to receive letsencrypt errors
+  * See the [platform repo](https://github.com/make-place/php-platform/blob/master/README.md#environment-variables) for instance configuration
 
 ## Server setup
 
-Follow these steps to set up a Make Place server
+Follow these steps to set up a Make Place server, using your stack repo,
+where $YOUR_USERNAME is the user you sign in with, e.g. `root` or `rob`.
 
-> Where $YOUR_USERNAME is the user your sign in with, e.g. `root` or `rob`
+> You can use the user commands later to set up a `deploy` user in server group
 
 ```bash
 # Connect to your server
@@ -73,9 +78,9 @@ ssh root@my-server.io
 
 # Setup a server usergroup
 sudo groupadd server
-sudo usermod -G docker,server $YOUR_USERNAME
+sudo usermod -aG docker,server $YOUR_USERNAME
 
-# Create the directory & give it grouped permissions
+# Create a stack directory & give it group-based permissions
 mkdir /srv/stack
 sudo chown -R $YOUR_USERNAME:server /srv/stack
 sudo chmod -R g+ws /srv/stack
@@ -85,31 +90,32 @@ cd /srv/stack
 git clone $YOUR_REPO
 
 # Create any .env files at this point
-# Recreate your local secrets/ folder on the server
+# i.e. recreate your local secrets/ folder on the server
 
-# Startup the core server containers
+# Startup the core core containers
 docker-compose up -d nginx nginx-gen letsencrypt mysql
 
 # Configure your mysql now (i.e. with a GUI like Sequel Pro)
-# Add a databases for each deployment and one for the geo service
+# Add a databases for each deployment and one for the geo service & access
 
-# Fill in your .env files, see secrets/ for what should be set
+# Fill in your .env files with credentials, see secrets/ for what should be set
 
 # Start up the rest of the server
 docker-compose up -d
 
-# Setup the deploy script for CI
+# Setup the deploy script for CI/CD
 sudo ln -s deploy.sh /usr/bin/deploy
 sudo chmod +x /usr/bin/deploy
+
+# Setup your geography service
+# ref: https://github.com/make-place/geography#sample-deployment
 
 # Your server is up and running
 ```
 
 ## First deployment setup
 
-When you have just added a deployment, follow these steps on the server:
-
-> Where $DEPLOYMENT is your deployment name & $URL is it's url
+When you have just added a deployment, follow these steps on the server:, where $DEPLOYMENT is your deployment name & $URL is it's url.
 
 ```bash
 # Go to the stack
@@ -125,6 +131,9 @@ docker-compose up -d $DEPLOYMENT
 # You can sign in with the details your put in $DEPLOYMENT.env
 open $URL/dev/build?flush
 
+# Visit /admin and set your user's password to a secure password
+open $URL/admin
+
 # Re-comment DEFAULT_USER & DEFAULT_PASS in $DEPLOYMENT.env
 nano secrets/$DEPLOYMENT.env
 
@@ -132,4 +141,21 @@ nano secrets/$DEPLOYMENT.env
 docker-compose up -d $DEPLOYMENT
 
 # Your deployment is up and running
+# You can configure it through the CMS
 ```
+
+## Updating a deployment
+
+```bash
+# For example, deploy pug-spotter & holding site after updating $YOUR_REPO
+ssh rob@make.place deploy pug-spotter holding-site
+```
+
+## Further work & ideas
+
+* Separate core & deployment services into 2 docker-compose files
+* Setup continuous integration with GitLab with a `deploy` user
+* Modify your `nginx.tmpl.conf` to use a custom error page
+* Update `sites.yml` to reflect new deployments
+* Add to `redirs.conf` to implement custom nginx redirects
+* Use the `mkpl/static-pages` docker image to add holding sites
