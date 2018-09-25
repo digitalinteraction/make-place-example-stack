@@ -5,7 +5,7 @@
 # e.g. `sh ./deploy.sh nginx mysql geo`
 
 # Go to the stack
-cd /where/your/repo/is
+cd /srv/stack
 
 # Pull the latest changes
 git pull origin master
