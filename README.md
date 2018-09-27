@@ -57,13 +57,13 @@ Deployments are defined as services in the `docker-compose.yml` at the bottom.
 To add a deployment, copy/replace the `pug-spotter` service and make the following changes:
 
 1. Setup an assets volume
-  1. Set `pugs_assets` to something unique
-  2. Add it as an entry to the root level `volumes` at the top
+    1. Set `pugs_assets` to something unique
+    2. Add it as an entry to the root level `volumes` at the top
 2. Set `secrets/pugs.env` to a new secrets filename
 3. Configure the deployment's environment
-  * Set `VIRTUAL_HOST` & `LETSENCRYPT_HOST` to your domain
-  * Set `LETSENCRYPT_EMAIL` to your email address to receive letsencrypt errors
-  * See the [platform repo](https://github.com/make-place/php-platform/blob/master/README.md#environment-variables) for instance configuration
+    * Set `VIRTUAL_HOST` & `LETSENCRYPT_HOST` to your domain
+    * Set `LETSENCRYPT_EMAIL` to your email address to receive letsencrypt errors
+    * See the [platform repo](https://github.com/make-place/php-platform/blob/master/README.md#environment-variables) for instance configuration
 
 ## Server setup
 
